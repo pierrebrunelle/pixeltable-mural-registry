@@ -19,7 +19,7 @@ A registry of a city's murals. Upload a wall photo with the title, artist and ne
 - **Incremental computed columns** powered by plain Python UDFs (`@pxt.udf`)
 - **B-tree indexes** declared on the model (`__indexes__`) back the lookup queries
 - **FastAPI serving**: one `FastAPIRouter` turns tables and `@pxt.query` functions into typed REST routes (insert, update, delete, compute and query) with OpenAPI docs
-- **Importable UDF module**: UDFs in `udfs.py`, tables in `models.py`, queries in `queries.py`, routes in `app.py` (Pixeltable resolves UDFs by module path)
+- **Importable UDF module**: UDFs live in `udfs.py`; tables, queries and routes live together in `app.py` (Pixeltable resolves UDFs by module path)
 - **`pixeltable.toml`** declares a local database and a **Pixeltable Cloud** database, so the same code deploys with `pxt db update`
 
 ## Where the images go
@@ -46,17 +46,15 @@ Generated media is created once on insert. The demo sends 8 multipart uploads at
 
 | File | What it is |
 |------|------------|
-| `app.py` | The API: one `FastAPIRouter` wiring the tables and queries into REST routes |
+| `app.py` | The app: tables declared as Python classes, `@pxt.query` functions, and the `FastAPIRouter` routes |
 | `client_demo.py` | Analyze, upload (in parallel), browse and download mural thumbnails through the API |
 | `data/canopy.png` | Sample data |
 | `data/harbor-wave.png` | Sample data |
 | `data/long-mile.png` | Sample data |
 | `data/sunflower-wall.png` | Sample data |
-| `models.py` | Tables declared as Python classes: columns, computed columns, indexes |
 | `pixeltable.toml` | Project config: the local database plus a Pixeltable Cloud database (sizing, deploy excludes) |
-| `queries.py` | `@pxt.query` functions served as query routes |
 | `seed.py` | Seed four murals with sample wall photos from data/ |
-| `udfs.py` | Pixeltable UDFs (`@pxt.udf`) in their own importable module |
+| `udfs.py` | Pixeltable UDFs (`@pxt.udf`) in their own importable module, imported by `app.py` |
 | `requirements.txt` / `pyproject.toml` | Dependencies (`pixeltable[serve]>=0.7.14`) |
 
 **Tables**
@@ -134,10 +132,10 @@ def aspect_band(photo: PIL.Image.Image) -> str:
     return 'wide' if r < 2.0 else 'panorama'
 ```
 
-**2. Tables are Python classes (`models.py`).** Annotated attributes are stored columns; attributes assigned an expression are **computed columns** (`id`, `thumb`, `gray`, `aspect`, `channel`, `tone`), evaluated incrementally on every insert or update and recomputed when their inputs change. Indexes live next to the columns.
+**2. Tables are Python classes (`app.py`).** Annotated attributes are stored columns; attributes assigned an expression are **computed columns** (`id`, `thumb`, `gray`, `aspect`, `channel`, `tone`), evaluated incrementally on every insert or update and recomputed when their inputs change. Indexes live next to the columns.
 
 ```python
-# models.py
+# app.py
 class Murals(TableModel, name='murals', has_default_idxs=False):
     id = pxt.Column(value=pxtf.uuid.uuid7(), primary_key=True)
     title: pxt.String
@@ -154,10 +152,10 @@ class Murals(TableModel, name='murals', has_default_idxs=False):
     __indexes__ = [pxt.BtreeIndex(neighborhood)]
 ```
 
-**3. Queries are functions (`queries.py`).** `@pxt.query` wraps a Pixeltable query so it can be called from Python or exposed as a route:
+**3. Queries are functions (`app.py`).** `@pxt.query` wraps a Pixeltable query so it can be called from Python or exposed as a route:
 
 ```python
-# queries.py
+# app.py
 @pxt.query
 def in_neighborhood(neighborhood: str):
     """Murals in one neighborhood (neighborhood index)."""
